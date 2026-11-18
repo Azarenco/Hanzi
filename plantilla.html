@@ -293,7 +293,13 @@ textarea.search { resize: vertical; font-family: ui-monospace, Menlo, monospace;
       <strong style="font-size:17px">Todo el vocabulario</strong>
     </div>
     <input class="search" id="q" type="search" placeholder="Busca en chino, pinyin o español" autocomplete="off">
+    <span class="label">Nivel</span>
     <div class="chips" id="listLevels"></div>
+    <span class="label">Lección</span>
+    <div class="chips" id="listLessons"></div>
+    <span class="label">Tipo de palabra</span>
+    <div class="chips" id="listTipos"></div>
+    <p class="note" id="listCount"></p>
     <div class="rows" id="rows"></div>
   </section>
 
@@ -619,20 +625,26 @@ function speak(text) {
 }
 
 /* ---------- list ---------- */
-let listLevel = "all";
+let listLevel = "all", listLesson = "all", listTipo = "all";
 function renderList() {
   const chips = $("listLevels"); chips.textContent = "";
   chips.appendChild(chip("ll-all", "Todo", null, listLevel === "all", () => { listLevel = "all"; renderList(); }));
   for (const l of LEVELS) chips.appendChild(chip("ll-" + l, lvLabel(l), null, listLevel === l, () => { listLevel = l; renderList(); }));
+  const lc = $("listLessons"); lc.textContent = "";
+  const lessonKeys = [...new Set(all().map(c => c[6]).filter(Boolean))].sort((a, b) => parseInt(a.slice(1)) - parseInt(b.slice(1)));
+  for (const l of ["all", ...lessonKeys]) lc.appendChild(chip("lls-" + l, l === "all" ? "Todas" : (LESSONS[l] || l).replace("Lección ", "L"), null, listLesson === l, () => { listLesson = l; renderList(); }));
+  const tc = $("listTipos"); tc.textContent = "";
+  for (const t of [{ key: "all", label: "Todos" }, ...TIPOS]) tc.appendChild(chip("llt-" + (t.key || "none"), t.label, null, listTipo === t.key, () => { listTipo = t.key; renderList(); }));
   const q = $("q").value.trim();
   const norm = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s/g, "");
   const nq = norm(q);
-  const hits = all().filter(c => (listLevel === "all" || c[5] === listLevel) && (!q || c[2].includes(q) || norm(c[3]).includes(nq) || norm(c[4]).includes(nq)));
+  const hits = all().filter(c => (listLevel === "all" || c[5] === listLevel) && (listLesson === "all" || c[6] === listLesson) && (listTipo === "all" || tipoOf(c) === listTipo) && (!q || c[2].includes(q) || norm(c[3]).includes(nq) || norm(c[4]).includes(nq)));
   const max = 150;
+  $("listCount").textContent = `${hits.length} palabra${hits.length === 1 ? "" : "s"}`;
   $("rows").innerHTML = hits.slice(0, max).map(c => `<div class="row"><span class="hz">${esc(c[2])}</span>
     <span><div class="rp">${esc(c[3])}</div><div class="re">${esc(c[4])}</div><div class="meta">${esc(tagText(c))}</div></span>${boxDots(K(c))}</div>`).join("")
     + (hits.length > max ? `<p class="more">Y ${hits.length - max} más. Afina la búsqueda para verlas.</p>` : "")
-    + (!hits.length ? `<p class="more">No hay ninguna palabra con «${esc(q)}».</p>` : "");
+    + (!hits.length ? `<p class="more">${q ? `No hay ninguna palabra con «${esc(q)}» con estos filtros.` : "No hay ninguna palabra con estos filtros."}</p>` : "");
 }
 $("q").oninput = renderList;
 $("listBtn").onclick = () => { show("list"); renderList(); };
